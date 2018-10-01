@@ -1,4 +1,70 @@
 ## CHANGELOG:
+* v5.6 - Changed automatic report generation to "ON" for Sn1per Pro users
+* v5.5 - Added new multi-threaded high speed "flyover" mode added
+* v5.5 - Added new scan status mode via (sniper --status) command
+* v5.5 - Apache Struts CVE-2018-11776 RCE exploit
+* v5.5 - Added Android Insecure ADB RCE auto exploit
+* v5.5 - Added Apache Tomcat CVE-2017-12617 RCE exploit
+* v5.5 - Added Oracle WebLogic WLS-WSAT Component Deserialisation RCE CVE-2017-10271 MSF exploit
+* v5.5 - Added BlackWidow web application scanner with INJECTX fuzzer
+* v5.5 - Added CVE-2018-15473 SSH user enumeration script
+* v5.5 - Minor wordlist updates for web file brute forcing
+* v5.4 - Updated Golang in install.sh
+* v5.3 - Updated AMass repo in install.sh
+* v5.3 - Removed CloudFail
+* v5.3 - Fixed issue with subfinder missing brute force list
+* v5.3 - Fixed issue with invalid dnsscan reference
+* v5.2 - Added SubOver subdomain takeover scanner
+* v5.2 - Added Subfinder subdomain enumeration tool
+* v5.2 - Added Amass subdomain enumeration tool
+* v5.2 - Added configurable modules/plugins to sniper script
+* v5.2 - Added MS17-010 SMB Etternal Blue MSF exploit
+* v5.2 - Added MSF Postgresql login scanner
+* v5.2 - Added passive web spider
+* v5.2 - Added WebDav metasploit aux modules
+* v5.2 - Added NetBIOS NMap/MSF enumeration
+* v5.2 - Added SMB MSF enumeration
+* v5.2 - Added NSF MSF enumeration
+* v5.2 - Added SSH MSF enumeration
+* v5.2 - Added BadBlue Passthru MSF exploit
+* v5.2 - Added SMB GPP MSF aux module
+* v5.2 - Added Intel AMT MSF scanner
+* v5.2 - Added MySQL MSF scanner
+* v5.2 - Added MS03-026 DCOM RCE MSF exploit
+* v5.2 - Added VNC no auth MSF scanner
+* v5.2 - Added FTP MSF version scanner
+* v5.2 - Added FTP anonymous access MSF scanner
+* v5.2 - Added MS12-020 RDP MSF scanner
+* v5.2 - Added MS10-061 Spoolss MSF exploit
+* v5.2 - Added MS15-034 Sys Memory Dump MSF exploit
+* v5.2 - Added MS06-040 Netapi MSF exploit
+* v5.2 - Added MS05-039 PNP MSF exploit
+* v5.2 - Added MS12-020 Max Channels RDP scanner
+* v5.2 - Added JBoss status MSF scanner
+* v5.2 - Added Apache Struts 2 REST Plugin XStream RCE check
+* v5.2 - Added Apache Tomcat UTF8 Traversal MSF exploit
+* v5.2 - Added Apache OPTIONS Bleed MSF exploit
+* v5.2 - Added HP ILO Auth Bypass MSF exploit
+* v5.2 - Added Jooma Comfields SQL injection MSF exploit
+* v5.1 - Added dnscan to install.sh and updated sniper references which were broken
+* v5.1 - Changed default brute force list for dnscan to improve performance of scans
+* v5.1 - Removed CloudHunter and SubOver references (CC. 爱上平顶山)
+* v5.0 - Added Sn1per Pro reporting interface (see https://xerosecurity.com for more details)
+* v5.0 - Added GPON Router RCE auto exploit 
+* v5.0 - Added Cloudapp.net Azure subdomain takeover check
+* v5.0 - Added Cisco ASA Directory Traversal auto exploit (CVE-2018-0296)
+* v5.0 - Added Wig Web Information Gatherer
+* v5.0 - Added Dirsearch with custom dirsearch wordlists (quick, normal, full)
+* v5.0 - Fixed bug in installer/upgrade which copied the local dir contents to the install dir
+* v5.0 - Improved scan performance while taking web screenshots 
+* v5.0 - Fixed repo issue with Slurp (Shoutz to @ifly53e)
+* v5.0 - Fixed issues with wrong ports listed in port scans (Shoutz to @ifly53e)
+* v5.0 - Minor code fixes and typos corrected (Shoutz to @ifly53e)
+* v5.0 - Updated "discover" mode scans for improved performance
+* v4.5 - Added Apache Struts 2 CVE-2017-9805 and CVE-2017-5638 detection
+* v4.5 - Added dirsearch web/file brute forcing
+* v4.5 - Added smart file/directory brute forcing to all scan modes.
+* v4.5 - Added subdomain brute force scan option to Sublist3r scan.
 * v4.4 - Fixed issue with sniper nuke and airstrike modes not running.
 * v4.4 - Added improved SNMP checks via NMap/Metasploit.
 * v4.4 - Resolved dependency issue for nfs-common package.
