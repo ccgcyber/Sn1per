@@ -12,16 +12,21 @@ Sn1per Community Edition is an automated scanner that can be used during a penet
 
 ## SN1PER PROFESSIONAL FEATURES:
 ### Professional reporting interface
+![](https://xerosecurity.com/images/Sn1per-v6_dashboard1.PNG)
 ### Slideshow for all gathered screenshots
-![](https://xerosecurity.com/images/sn1per-pro4.png)
+![](https://xerosecurity.com/images/Sn1per-v6_screenshot6c.png)
 ### Searchable and sortable DNS, IP and open port database
-![](https://xerosecurity.com/images/Sn1per-pro11.png)
-### Categorized host reports
+![](https://xerosecurity.com/images/Sn1per-v6_screenshot31.PNG)
+### Detailed host reports
 ![](https://xerosecurity.com/images/Sn1per-pro8.png)
+### NMap HTML host reports
+![](https://xerosecurity.com/images/Sn1per-v6_screenshot9.png)
 ### Quick links to online recon tools and Google hacking queries
 ![](https://xerosecurity.com/images/sn1per-pro5.png)
-### Personalized notes field for each host
-![](https://xerosecurity.com/images/sn1per-pro13.png)
+### Takeovers and Email Security
+![](https://xerosecurity.com/images/Sn1per-v6_screenshot16.png)
+### HTML5 Notepad
+![](https://xerosecurity.com/images/Sn1per-v6_screenshot15.png)
 
 ## ORDER SN1PER PROFESSIONAL:
 To obtain a Sn1per Professional license, go to https://xerosecurity.com. 
@@ -80,19 +85,8 @@ To obtain a Sn1per Professional license, go to https://xerosecurity.com.
 ```
 
 ## DOCKER INSTALL:
-
-Credits: @menzow
-
-Docker Install:
-https://github.com/menzow/sn1per-docker
-
-Docker Build:
-https://hub.docker.com/r/menzo/sn1per-docker/builds/bqez3h7hwfun4odgd2axvn4/
-
-Example usage:
 ```
-$ docker pull menzo/sn1per-docker
-$ docker run --rm -ti menzo/sn1per-docker sniper menzo.io
+docker build Dockerfile
 ```
 
 ## USAGE:
@@ -145,6 +139,12 @@ sniper -t|--target <TARGET>
 [*] LOOT REIMPORT FUNCTION
 sniper -w <WORKSPACE_ALIAS> --reimport
 
+[*] DELETE WORKSPACE
+sniper -w <WORKSPACE_ALIAS> -d
+
+[*] DELETE HOST FROM WORKSPACE
+sniper -w <WORKSPACE_ALIAS> -t <TARGET> -dh
+
 [*] SCAN STATUS
 sniper --status
 
@@ -169,7 +169,7 @@ sniper -u|--update
 https://gist.github.com/1N3/8214ec2da2c91691bcbc
 
 ## LICENSE:
-This software is free to distribute, modify and use with the condition that credit is provided to the creator (xer0dayz@XeroSecurity) and is not for commercial use. Permission to distribute any part of the code for sale is strictly prohibited.
+This software is free to distribute, modify and use with the condition that credit is provided to the creator (@xer0dayz @XeroSecurity) and is not for commercial use. Permission to distribute any part of the code for sale is strictly prohibited.
 
 ## DONATIONS:
 Donations are welcome. This will help fascilitate improved features, frequent updates and better overall support for sniper.

