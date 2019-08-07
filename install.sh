@@ -82,13 +82,22 @@ git clone https://github.com/rbsec/dnscan.git
 git clone https://github.com/christophetd/censys-subdomain-finder.git
 pip install -r $PLUGINS_DIR/censys-subdomain-finder/requirements.txt
 pip3 install -r $PLUGINS_DIR/dnscan/requirements.txt 
-pip install webtech
+pip3 install webtech
 mv $INSTALL_DIR/bin/slurp.zip $PLUGINS_DIR
 unzip slurp.zip
 rm -f slurp.zip
+cd ~/go/bin/;go get github.com/haccer/subjack
 cd ~/go/bin/;go get -u github.com/Ice3man543/SubOver; mv SubOver /usr/local/bin/subover
-cd ~/go/bin;go get -u github.com/OWASP/Amass/cmd/amass; mv amass /usr/local/bin/
+rm -Rf ~/go/src/amass_2.9.0_linux_amd64 2> /dev/null
+wget https://github.com/OWASP/Amass/releases/download/2.9.0/amass_2.9.0_linux_amd64.zip -O ~/go/src/amass.zip
+cd ~/go/src/
+unzip ~/go/src/amass.zip
+ln -s ~/go/src/amass_2.9.0_linux_amd64/amass /usr/local/bin/amass2.9 -f
+rm -f ~/go/src/amass.zip
 cd ~/go/bin;go get -u github.com/subfinder/subfinder; mv subfinder /usr/local/bin/subfinder
+cd /usr/share/nmap/scripts/
+git clone https://github.com/scipag/vulscan
+wget https://raw.githubusercontent.com/vulnersCom/nmap-vulners/master/vulners.nse
 cd $PLUGINS_DIR
 echo -e "$OKORANGE + -- --=[Setting up environment...$RESET"
 mv ~/.sniper.conf ~/.sniper.conf.old 2> /dev/null

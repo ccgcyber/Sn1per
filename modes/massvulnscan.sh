@@ -1,5 +1,5 @@
-# AIRSTRIKE MODE #####################################################################################################
-if [ "$MODE" = "airstrike" ]; then
+# MASSWEB MODE #####################################################################################################
+if [ "$MODE" = "massweb" ]; then
   if [ -z "$FILE" ]; then
     logo
     echo "You need to specify a list of targets (ie. -f <targets.txt>) to scan."
@@ -8,18 +8,6 @@ if [ "$MODE" = "airstrike" ]; then
   if [ "$REPORT" = "1" ]; then
     for a in `cat $FILE`;
     do
-      if [ "$AUTOBRUTE" = "1" ]; then
-        args="$args -b"
-      fi
-      if [ "$FULLNMAPSCAN" = "1" ]; then
-        args="$args -fp"
-      fi
-      if [ "$OSINT" = "1" ]; then
-        args="$args -o"
-      fi
-      if [ "$RECON" = "1" ]; then
-        args="$args -re"
-      fi
       if [ ! -z "$WORKSPACE" ]; then
         args="$args -w $WORKSPACE"
         WORKSPACE_DIR=$INSTALL_DIR/loot/workspace/$WORKSPACE
@@ -32,7 +20,7 @@ if [ "$MODE" = "airstrike" ]; then
         mkdir $WORKSPACE_DIR/reports 2> /dev/null
         mkdir $WORKSPACE_DIR/output 2> /dev/null
       fi
-      args="$args -m stealth --noreport --noloot"
+      args="$args -m vulnscan --noreport --noloot"
       TARGET="$a"
       args="$args -t $TARGET"
       echo -e "$OKRED                                         |"

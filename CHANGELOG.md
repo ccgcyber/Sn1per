@@ -1,4 +1,45 @@
 ## CHANGELOG:
+* v7.2 - Added experimental OpenVAS API integration
+* v7.2 - Improved Burpsuite 2.x API integration with vuln reporting
+* v7.2 - Added hunter.io API integration to recon mode scans
+* v7.2 - Added Cisco IKE Key Disclosure MSF exploit
+* v7.2 - Added JBoss MSF vuln scanner module
+* v7.2 - Added Apache CouchDB RCE MSF exploit
+* v7.2 - Added IBM Tivoli Endpoint Manager POST Query Buffer Overflow exploit
+* v7.2 - Added Java RMI MSF scanner
+* v7.2 - New scan mode "vulnscan"
+* v7.2 - New scan mode "massportscan"
+* v7.2 - New scan mode "massweb"
+* v7.2 - New scan mode "masswebscan"
+* v7.2 - New scan mode "massvulnscan"
+* v7.2 - Added additional Slack API notification settings
+* v7.2 - Improved NMap port detection and scan modes
+* v7.2 - Fixed issue with Censys API being enabled by default
+* v7.2 - Fixed verbose errors in subjack/subover tools
+* v7.2 - Fixed issue with NMap http scripts not working
+* v7.1 - Added KeepBlue CVE-2019-0708 MSF scanner
+* v7.1 - Added automatic workspace generation for single target scans
+* v7.1 - Added new slack.sh API integration script
+* v7.1 - Added differential Slack notifications for new domains, new URL's and various scan outputs
+* v7.1 - Added vulners and vulscan NMap scripts
+* v7.1 - Added installer and support for Debian, Parrot and Ubuntu OS (install_debian.sh) (CC. @imhaxormad)
+* v7.1 - Fixed various issues with the DockerFile
+* v7.1 - Fixed/added Metasploit LHOST/LPORT values to all exploits based on sniper.conf settings
+* v7.1 - Fixed issue with Amass/Golang 1.11 not installing correctly
+* v7.0 - Added "webscan" mode for automated Burpsuite 2.x and Arachni web application scans only
+* v7.0 - Added Slack API notifications (Disabled by default..check ~/.sniper.conf)
+* v7.0 - Added new command switch to add daily, weekly or monthly sniper scheduled scans... check README
+* v7.0 - Added scheduled scan tasks command switch (Needs additional configuration to setup... check README)
+* v7.0 - Added Axis2 authenticated deployer MSF exploit
+* v7.0 - Added Axis2 login brute force module
+* v7.0 - Added subjack tool to check for subdomain hijacking
+* v7.0 - Added sorted IP lists under $LOOT_DIR/ips/ips-all-sorted.txt
+* v7.0 - Added subnet retrieval for all 'recon' mode scans under $LOOT_DIR/nmap/subnets-$TARGET.txt
+* v7.0 - Added Webscreenshot.py and disabled cutycapt from default config
+* v7.0 - Added Gobuster (Disabled by default..check ~/.sniper.conf)
+* v7.0 - Fixed issue with SubOver not working due to bad path
+* v7.0 - Fixed issue with flyover mode running 2x 
+* v6.3 - Added Drupal RESET Unserialize RCE CVE-2019-6340
 * v6.2 - Added Glassfish Admin traversal MSF exploit 
 * v6.2 - Added ElasticSearch Java Injection MSF RCE exploit
 * v6.2 - Added WebTech web fingerprinting tool
