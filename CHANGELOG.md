@@ -1,4 +1,50 @@
 ## CHANGELOG:
+* v8.1 - Updated DockerFile repository
+* v8.1 - Fixed issue with -dh flag to delete host with Sn1per Pro v8.0
+* v8.1 - Fixed issue with subfinder missing
+* v8.1 - Fixed issue with 7zip missing
+* v8.1 - Added check for Ubuntu to install.sh automatically
+* v8.0 - Added ASnip tool to retrieve ASN's via 'recon' mode
+* v8.0 - Added Shodan sub-domain lookup
+* v8.0 - Added script timeout flag for NMap scripts
+* v8.0 - Fixed issue with dnsenum getting stuck on gathering dns info stage
+* v8.0 - Added option to force upgrade/install.sh without user prompt (ie. ./install.sh force)
+* v8.0 - Fixed issue with theHarvester package on Ubuntu systems
+* v8.0 - Fixed error "[: ==: unary operator expected" in all modes
+* v8.0 - Added net-tools package for Ubuntu OS deps
+* v7.4 - Added LDAP anomyous search to port 389/tcp checks (Shoutout @D0rkerDevil)
+* v7.4 - Added Java RMI dump registry scan checks and exploits to port 8001/tcp (Shoutout @D0rkerDevil)
+* v7.4 - Added CheckPoint Firewall-1 SecuRemote Topology Service Hostname Disclosure MSF module
+* v7.4 - Added virtualhost scanning via web mode
+* v7.4 - Added Gobuster
+* v7.4 - Addd URLCrazy DNS alterations check to OSINT mode
+* v7.4 - Added Ultratools Whois Lookups to OSINT mode
+* v7.4 - Added Email-Format.com Email Retreival to OSINT mode
+* v7.4 - Added Metasploit OSINT email retrieval to OSINT mode
+* v7.4 - Added Hackertarget URL API retrieval to web modes
+* v7.4 - Fixed error in massvulnscan mode
+* v7.4 - Fixed issue with webscreenshot.py not running
+* v7.4 - Added reverse whois DNS search via AMass
+* v7.4 - Added MassDNS IP's to master sorted IP list 
+* v7.4 - Fixed issue with MassDNS installation
+* v7.4 - Fixed bad path with DNSGen 
+* v7.4 - Fixed issue with AMass not running
+* v7.4 - Improved performance of AltDNS/DNSgen/MassDNS retrieval
+* v7.4 - Changed webscreenshot.py setting to use chrome browser and increased timeout
+* v7.4 - Fixed issue with missing xmlstarlet package for OpenVAS scans
+* v7.4 - Improved active web spider URL consolidation
+* v7.3 - Added CVE-2019-15107 Webmin <= 1.920 - Unauthenticated RCE MSF exploit
+* v7.3 - Added massdns plugin
+* v7.3 - Added altdns plugin
+* v7.3 - Added dnsgen plugin
+* v7.3 - Updated web file/dir wordlists from public exploits and honeypots
+* v7.3 - Added time stamps to all commands
+* v7.3 - Removed CloudFront from domain hijacking checks
+* v7.3 - Removed snmp-brute.nse script due to scan issues
+* v7.3 - Fixed issue with discover scan workspace names
+* v7.3 - Fixed issue with DockerFile (sed: can't read /usr/bin/msfdb: No such file or directory)
+* v7.3 - Fixed issue with installer on docker not having pip installed
+* v7.3 - Fixed issue with port 161 not being referenced correctly in scans
 * v7.2 - Added experimental OpenVAS API integration
 * v7.2 - Improved Burpsuite 2.x API integration with vuln reporting
 * v7.2 - Added hunter.io API integration to recon mode scans
